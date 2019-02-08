@@ -105,10 +105,4 @@ func TXWatcher(txChan <-chan string) (err error) {
 			}).Info()
 		}
 	}
-	// receive transaction to watch
-	// connect to client
-	// for each block
-	//   for each transaction in block
-	//     mark transaction as seen
-	// statistics
 }
