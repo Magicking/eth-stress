@@ -60,7 +60,7 @@ func TXWatcher(txChan <-chan string) (err error) {
 				}
 			}
 			log.WithFields(log.Fields{
-				"Hash":       blk.Hash().Hex(),
+				"Hash":       blk.Hash().TerminalString(),
 				"cb":         blk.Coinbase().Hex(),
 				"difficulty": blk.Difficulty(),
 				//				"extra":      hex.EncodeToString(b.Extra),
