@@ -7,6 +7,7 @@ A WIP CLI ethereum client stresser
 ## Example
 
 ```
+go get github.com/Magicking/quorum-stress/cmd/stress
 stress --from 0x6120a30e955b6dd99c9adc6e1ece6dcc6d48a53f --to 0x6120a7e00f3b2937362dfdac9f80b79f5b55f165 --rpc-url ws://127.0.0.1:8546 --max-tx 20000 --max-open-conn 200
 
 INFO[0014] Start time 2019-02-08 02:24:38.872591 +0100 CET m=+0.014778258 
