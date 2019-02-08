@@ -13,11 +13,13 @@ import (
 func TXWatcher(txChan <-chan string) (err error) {
 	txMap := make(map[string]bool)
 	ticker := time.NewTicker(1 * time.Second)
-	counter := 0
+	sent := 0
 	seen := 0
 	lastSeen := 0
+	lastSent := 0
 	var txAvg []float64
-	var txpersec float64
+	var txpsSeen float64
+	var txpsSent float64
 	var client *ethclient.Client
 	var maxBlock uint64
 	lastCount := time.Now()
@@ -42,7 +44,7 @@ func TXWatcher(txChan <-chan string) (err error) {
 	for {
 		select {
 		case tx := <-txChan:
-			counter++
+			sent++
 			txMap[tx] = true
 		case <-Done:
 			Done <- true
@@ -72,8 +74,10 @@ func TXWatcher(txChan <-chan string) (err error) {
 			}).Info()
 			timeSpent := time.Since(lastCount).Seconds()
 			lastCount = time.Now()
-			txpersec = float64(seen-lastSeen) / timeSpent
+			txpsSeen = float64(seen-lastSeen) / timeSpent
 			lastSeen = seen
+			txpsSent = float64(sent-lastSent) / timeSpent
+			lastSent = sent
 		case err := <-sub.Err():
 			log.Println(err)
 			Done <- true
@@ -83,10 +87,8 @@ func TXWatcher(txChan <-chan string) (err error) {
 				log.Println(err) //TODO
 				continue
 			}
-			// for each last to max
-			// get lastblock
 			maxBlock = b.NumberU64()
-			txAvg = append(txAvg, txpersec)
+			txAvg = append(txAvg, txpsSeen)
 			var diff float64
 			for _, e := range txAvg {
 				diff += e
@@ -97,11 +99,12 @@ func TXWatcher(txChan <-chan string) (err error) {
 			}
 			log.WithFields(log.Fields{
 				"tx/s avg":     fmt.Sprintf("%.02f", diff),
-				"tx/s":         fmt.Sprintf("%.02f", txpersec),
+				"seen tx/s":    fmt.Sprintf("%.02f", txpsSeen),
+				"sent tx/s":    fmt.Sprintf("%.02f", txpsSent),
 				"block number": maxBlock,
 				"connection":   OpenedConnection,
 				"seen tx":      seen,
-				"sent tx":      counter,
+				"sent tx":      sent,
 			}).Info()
 		}
 	}
