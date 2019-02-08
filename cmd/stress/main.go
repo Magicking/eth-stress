@@ -31,6 +31,7 @@ var Ethopts struct {
 	PrivateKey        string   `long:"pkey" env:"PRIVATE_KEY" description:"Hex encoded private key"`
 	MaxOpenConnection int64    `long:"max-open-conn" default:"1" env:"MAX_OPEN_CONNECTION" description:"Maximum opened connection to Quorum"`
 	MaxTransaction    int64    `long:"max-tx" default:"1" env:"MAX_TRANSACTION" description:"Maximum transaction to send"`
+	ABI               string   `long:"abi" env:"ABI" description:"ABI to enable events watching"`
 }
 
 // TransactionArgs represents the arguments for a transaction.
@@ -150,6 +151,7 @@ func main() {
 	rootCmd.PersistentFlags().IntVar(&Ethopts.Retry, "retry", 3, "Max connection retry")
 	rootCmd.PersistentFlags().Int64Var(&Ethopts.MaxOpenConnection, "max-open-conn", 1, "Maximum opened connection to Quorum")
 	rootCmd.PersistentFlags().Int64Var(&Ethopts.MaxTransaction, "max-tx", 1, "Maximum transaction to send")
+	rootCmd.PersistentFlags().StringVar(&Ethopts.ABI, "abi", "", "ABI to enable events watching")
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
