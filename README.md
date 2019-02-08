@@ -2,7 +2,7 @@
 
 ## Description
 
-A CLI ethereum client stresser with emphasis on privacy enabled clients
+A WIP CLI ethereum client stresser
 
 ## Example
 
@@ -44,6 +44,7 @@ INFO[0025] Hash="e50506…533ed9" cb=0x0000000000000000000000000000000000000000 
 
  - [x] Public
  - [ ] Private
+ - [ ] Contract
 
 ## Endpoint type
 
@@ -53,9 +54,9 @@ INFO[0025] Hash="e50506…533ed9" cb=0x0000000000000000000000000000000000000000 
 ## RPC
 
  - [x] sendTransaction
- - [ ] sendTransactionAsync
+ - [ ] sendTransactionAsync (quorum)
  - [ ] sendRawTransaction
- - [ ] sendRawPrivateTransaction
+ - [ ] sendRawPrivateTransaction (quorum)
 
 ## Status report
 
