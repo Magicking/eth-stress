@@ -139,7 +139,7 @@ func sendTransaction(counter *int64, c chan string, startPill <-chan interface{}
 			}
 			if err != nil {
 				atomic.AddInt64(counter, -1)
-				log.Println(err)
+				log.Println("SendTranction", err)
 				break
 			}
 			c <- txHash
@@ -166,9 +166,6 @@ var rootCmd = &cobra.Command{
 				log.Fatal(err)
 			}
 			_from := crypto.PubkeyToAddress(key.PublicKey)
-			if Ethopts.From != "" {
-				log.Println("From", _from.String())
-			}
 			err = NM.Add(_from)
 			if err != nil {
 				log.Fatal(err)
@@ -179,6 +176,7 @@ var rootCmd = &cobra.Command{
 		if Ethopts.From != "" && TransactionKind != kindSigned {
 			TransactionKind = kindUnsigned
 		}
+		log.Println("From", Ethopts.From)
 		c := make(chan string)
 		startPill := make(chan interface{})
 		go func() {

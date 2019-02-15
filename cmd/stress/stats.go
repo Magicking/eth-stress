@@ -27,11 +27,11 @@ func TxWatcher(txChan <-chan string, startPill chan interface{}) (err error) {
 	for retry := 0; retry < Ethopts.Retry; retry++ {
 		time.Sleep((2 << uint(retry)) * time.Second)
 		client, err = ethclient.Dial(Ethopts.RPCURL)
-		if err != nil {
-			if (retry + 1) == Ethopts.Retry {
-				return err
-			}
-			continue
+		if err == nil {
+			break
+		}
+		if (retry + 1) == Ethopts.Retry {
+			return err
 		}
 	}
 	defer client.Close()
@@ -51,7 +51,7 @@ func TxWatcher(txChan <-chan string, startPill chan interface{}) (err error) {
 			Done <- true
 			return
 		case b := <-bChan:
-			blk, err := client.BlockByHash(context.TODO(), b.Hash())
+			blk, err := client.BlockByHash(context.TODO(), b.ParentHash)
 			if err != nil {
 				log.Println(err)
 				continue
@@ -59,6 +59,7 @@ func TxWatcher(txChan <-chan string, startPill chan interface{}) (err error) {
 			txs := blk.Transactions()
 			for _, tx := range txs {
 				if txMap[tx.Hash().Hex()] {
+					txMap[tx.Hash().Hex()] = false
 					seen++
 				}
 			}

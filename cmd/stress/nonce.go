@@ -49,14 +49,15 @@ type NonceManager struct {
 
 func NewNonceManager(retry int, rpcurl string) (nm *NonceManager, err error) {
 	var client *ethclient.Client
+	log.Println("Starting nonce manager")
 	for i := 0; i < retry; i++ {
 		time.Sleep((2 << uint(i)) * time.Second)
 		client, err = ethclient.Dial(rpcurl)
-		if err != nil {
-			if (i + 1) >= retry {
-				return nil, err
-			}
-			continue
+		if err == nil {
+			break
+		}
+		if (i + 1) >= retry {
+			return nil, err
 		}
 	}
 	networkId, err := client.NetworkID(context.TODO())
