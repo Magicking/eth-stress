@@ -10,7 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func TXWatcher(txChan <-chan string) (err error) {
+func TxWatcher(txChan <-chan string, startPill chan interface{}) (err error) {
 	txMap := make(map[string]bool)
 	ticker := time.NewTicker(1 * time.Second)
 	sent := 0
@@ -41,6 +41,7 @@ func TXWatcher(txChan <-chan string) (err error) {
 		log.Fatalf("Could not register for event: %v", err)
 	}
 	log.Println("Start time", lastCount)
+	close(startPill)
 	for {
 		select {
 		case tx := <-txChan:
@@ -50,7 +51,7 @@ func TXWatcher(txChan <-chan string) (err error) {
 			Done <- true
 			return
 		case b := <-bChan:
-			blk, err := client.BlockByHash(context.TODO(), b.ParentHash)
+			blk, err := client.BlockByHash(context.TODO(), b.Hash())
 			if err != nil {
 				log.Println(err)
 				continue
@@ -62,16 +63,16 @@ func TXWatcher(txChan <-chan string) (err error) {
 				}
 			}
 			log.WithFields(log.Fields{
-				"Hash":       blk.Hash().TerminalString(),
-				"cb":         blk.Coinbase().Hex(),
-				"difficulty": blk.Difficulty(),
+				"block number": blk.Number(),
+				"hash":         blk.Hash().TerminalString(),
+				"difficulty":   blk.Difficulty(),
 				//				"extra":      hex.EncodeToString(b.Extra),
-				"gasLimit":   blk.GasLimit(),
-				"gasUsed":    blk.GasUsed(),
-				"n":          blk.Number(),
-				"nTx":        blk.Transactions().Len(),
-				"chain time": time.Unix(blk.Time().Int64(), 0),
-			}).Info()
+				"gasLimit": blk.GasLimit(),
+				"gasUsed":  blk.GasUsed(),
+				"nTx":      blk.Transactions().Len(),
+				//				"cb":         blk.Coinbase().Hex(),
+				"block time": time.Unix(blk.Time().Int64(), 0),
+			}).Info("new block")
 			timeSpent := time.Since(lastCount).Seconds()
 			lastCount = time.Now()
 			txpsSeen = float64(seen-lastSeen) / timeSpent
@@ -98,13 +99,13 @@ func TXWatcher(txChan <-chan string) (err error) {
 				txAvg = txAvg[1:10]
 			}
 			log.WithFields(log.Fields{
-				"tx/s avg":     fmt.Sprintf("%.02f", diff),
-				"seen tx/s":    fmt.Sprintf("%.02f", txpsSeen),
-				"sent tx/s":    fmt.Sprintf("%.02f", txpsSent),
-				"block number": maxBlock,
-				"connection":   OpenedConnection,
-				"seen tx":      seen,
-				"sent tx":      sent,
+				"seen tx/s avg": fmt.Sprintf("%.02f", diff),
+				"seen tx/s":     fmt.Sprintf("%.02f", txpsSeen),
+				"sent tx/s":     fmt.Sprintf("%.02f", txpsSent),
+				"block number":  maxBlock,
+				"connection":    OpenedConnection,
+				"seen tx":       seen,
+				"sent tx":       sent,
 			}).Info()
 		}
 	}

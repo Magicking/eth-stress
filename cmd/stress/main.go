@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 	"os"
@@ -10,16 +11,27 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rpc"
-
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 var Done chan bool
 var OpenedConnection int64
+var TransactionKind int
+var NM *NonceManager
+
+const (
+	kindUnsigned = 1 << iota
+	kindSigned
+	kindAsync
+	kindRawPrivate
+)
 
 var Ethopts struct {
 	RPCURL            string   `long:"rpc-url" env:"RPC_URL" description:"Quorum RPC URL (e.g: http://kaleido.io/...)"`
@@ -51,16 +63,44 @@ type TransactionArgsPrivate struct {
 	PrivateFor  []string `json:"privateFor"`
 }
 
-func SendUnsignedTransaction(ec *rpc.Client, txArgs *TransactionArgsPrivate) (string, error) {
-	var ret string
-	return ret, ec.Call(&ret /*TODO*/, "eth_sendTransaction", txArgs)
+func (tx *TransactionArgsPrivate) SignedTransaction(transactor *bind.TransactOpts) []byte {
+	nonce := NM.NextNonce(tx.From)
+	_tx := types.NewTransaction(nonce, *tx.To, tx.Value.ToInt(), tx.Gas.ToInt().Uint64(), tx.GasPrice.ToInt(), tx.Data)
+	signedTx, err := transactor.Signer(types.NewEIP155Signer(big.NewInt(NM.NetworkId.Int64())), transactor.From, _tx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// TODO Quorum private
+	buf := bytes.NewBuffer(nil)
+	err = signedTx.EncodeRLP(buf)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return buf.Bytes()
 }
 
-func sendTransaction(counter *int64, c chan string) error {
+func SendUnsignedTransaction(ec *rpc.Client, txArgs *TransactionArgsPrivate) (ret string, err error) {
+	return ret, ec.Call(&ret, "eth_sendTransaction", txArgs)
+}
+
+func SendSignedTransaction(ec *rpc.Client, txArgs *TransactionArgsPrivate, transactor *bind.TransactOpts) (ret string, err error) {
+	rawtx := txArgs.SignedTransaction(transactor)
+	return ret, ec.Call(&ret, "eth_sendRawTransaction", "0x"+common.Bytes2Hex(rawtx))
+}
+
+func sendTransaction(counter *int64, c chan string, startPill <-chan interface{}) error {
+	<-startPill
 	if atomic.LoadInt64(counter) >= Ethopts.MaxTransaction {
 		return nil
 	}
-	// craft transaction
+	var transactor *bind.TransactOpts
+	if TransactionKind == kindSigned {
+		key, err := crypto.HexToECDSA(Ethopts.PrivateKey)
+		if err != nil {
+			log.Fatal(err)
+		}
+		transactor = bind.NewKeyedTransactor(key)
+	}
 	// connect with at least X retry
 	for retry := 0; retry < Ethopts.Retry && atomic.LoadInt64(counter) < Ethopts.MaxTransaction; retry++ {
 		time.Sleep((2 << uint(retry)) * time.Second)
@@ -90,13 +130,19 @@ func sendTransaction(counter *int64, c chan string) error {
 		}
 		for atomic.LoadInt64(counter) < Ethopts.MaxTransaction {
 			atomic.AddInt64(counter, 1)
-			ret, err := SendUnsignedTransaction(client, transactArg)
+			var txHash string
+			switch TransactionKind {
+			case kindUnsigned:
+				txHash, err = SendUnsignedTransaction(client, transactArg)
+			case kindSigned:
+				txHash, err = SendSignedTransaction(client, transactArg, transactor)
+			}
 			if err != nil {
 				atomic.AddInt64(counter, -1)
 				log.Println(err)
 				break
 			}
-			c <- ret
+			c <- txHash
 		}
 	}
 	return nil
@@ -107,13 +153,39 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		var wg sync.WaitGroup
 		var counter int64
+		var err error
 
+		NM, err = NewNonceManager(Ethopts.Retry, Ethopts.RPCURL)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer func() { NM.Close() }()
+		if Ethopts.PrivateKey != "" {
+			key, err := crypto.HexToECDSA(Ethopts.PrivateKey)
+			if err != nil {
+				log.Fatal(err)
+			}
+			_from := crypto.PubkeyToAddress(key.PublicKey)
+			if Ethopts.From != "" {
+				log.Println("From", _from.String())
+			}
+			err = NM.Add(_from)
+			if err != nil {
+				log.Fatal(err)
+			}
+			Ethopts.From = _from.String()
+			TransactionKind = kindSigned
+		}
+		if Ethopts.From != "" && TransactionKind != kindSigned {
+			TransactionKind = kindUnsigned
+		}
 		c := make(chan string)
+		startPill := make(chan interface{})
 		go func() {
 			for i := int64(0); i < Ethopts.MaxOpenConnection && i < Ethopts.MaxTransaction; i++ {
 				wg.Add(1)
 				go func() {
-					if err := sendTransaction(&counter, c); err != nil {
+					if err := sendTransaction(&counter, c, startPill); err != nil {
 						log.Errorln(err)
 					}
 					defer wg.Done()
@@ -121,7 +193,7 @@ var rootCmd = &cobra.Command{
 			}
 			wg.Wait()
 		}()
-		if err := TXWatcher(c); err != nil {
+		if err := TxWatcher(c, startPill); err != nil {
 			log.Fatal(err)
 		}
 	},

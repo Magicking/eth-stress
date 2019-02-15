@@ -1,34 +1,44 @@
-# Ethereum stresser
+# Ethereum transaction stresser
 
 ## Description
 
-A WIP CLI ethereum client stresser
+A WIP CLI ethereum client transaction stresser
+
+## Usage
+
+```
+Usage:
+  stress [flags]
+
+Flags:
+      --from string          Address of the emiter
+  -h, --help                 help for stress
+      --max-open-conn int    Maximum opened connection to Quorum (default 1)
+      --max-tx int           Maximum transaction to send (default 1)
+      --payload string       Transaction payload (default "00")
+      --pkey string          Hex encoded private key
+      --privateFor strings   Base64 encoded public key
+      --retry int            Max connection retry (default 3)
+      --rpc-url string       Quorum RPC URL (e.g: http://kaleido.io/...) (default "http://127.0.0.1:8545")
+      --to string            Address to send the payload
+```
 
 ## Example
 
 ```
 go get github.com/Magicking/quorum-stress/cmd/stress
+
 stress --from 0x6120a30e955b6dd99c9adc6e1ece6dcc6d48a53f --to 0x6120a7e00f3b2937362dfdac9f80b79f5b55f165 --rpc-url ws://127.0.0.1:8546 --max-tx 20000 --max-open-conn 200
 
 INFO[0014] Start time 2019-02-08 02:24:38.872591 +0100 CET m=+0.014778258 
-INFO[0014] block number=652 connection=200 seen tx=0 sent tx=4 tx/s=0.00 tx/s avg=0.00
-INFO[0014] Hash="156cbe…13d374" cb=0x0000000000000000000000000000000000000000 chain time="2019-02-08 02:24:51 +0100 CET" difficulty=2 gasLimit=2606389269495 gasUsed=0 n=652 nTx=0
-INFO[0015] block number=653 connection=200 seen tx=0 sent tx=1871 tx/s=0.00 tx/s avg=0.00
-INFO[0016] block number=653 connection=200 seen tx=0 sent tx=4019 tx/s=0.00 tx/s avg=0.00
-INFO[0016] Hash="47a0b2…7bce0e" cb=0x0000000000000000000000000000000000000000 chain time="2019-02-08 02:24:53 +0100 CET" difficulty=2 gasLimit=2603843967476 gasUsed=0 n=653 nTx=0
-INFO[0017] block number=654 connection=200 seen tx=0 sent tx=5406 tx/s=0.00 tx/s avg=0.00
-INFO[0018] block number=654 connection=200 seen tx=0 sent tx=5634 tx/s=0.00 tx/s avg=0.00
-INFO[0018] Hash="9b89ac…66a4c4" cb=0x0000000000000000000000000000000000000000 chain time="2019-02-08 02:24:55 +0100 CET" difficulty=2 gasLimit=2601301151103 gasUsed=169088 n=654 nTx=8
-INFO[0019] block number=655 connection=200 seen tx=8 sent tx=7354 tx/s=3.93 tx/s avg=0.66
-INFO[0020] block number=655 connection=200 seen tx=8 sent tx=8632 tx/s=3.93 tx/s avg=1.12
-INFO[0021] Hash="cdd46a…7dc885" cb=0x0000000000000000000000000000000000000000 chain time="2019-02-08 02:24:57 +0100 CET" difficulty=2 gasLimit=2598760818196 gasUsed=86150336 n=655 nTx=4076
-INFO[0021] block number=656 connection=200 seen tx=4084 sent tx=8636 tx/s=1193.20 tx/s avg=150.13
-INFO[0022] block number=656 connection=200 seen tx=4084 sent tx=9496 tx/s=1193.20 tx/s avg=266.03
-INFO[0022] Hash="0d1eb0…e19127" cb=0x0000000000000000000000000000000000000000 chain time="2019-02-08 02:24:59 +0100 CET" difficulty=2 gasLimit=2596223092032 gasUsed=29315632 n=656 nTx=1387
-INFO[0023] block number=657 connection=200 seen tx=5471 sent tx=10804 tx/s=1393.48 tx/s avg=378.77
-INFO[0024] block number=657 connection=200 seen tx=5471 sent tx=12340 tx/s=1393.48 tx/s avg=471.02
-INFO[0025] Hash="e50506…533ed9" cb=0x0000000000000000000000000000000000000000 chain time="2019-02-08 02:25:01 +0100 CET" difficulty=2 gasLimit=2593687760862 gasUsed=66810896 n=657 nTx=3161
-
+INFO[0121] new block                                     block number=111 block time="2019-02-15 02:26:48 +0100 CET" difficulty=2 gasLimit=70748612822601 gasUsed=64295712 hash="1921b2…5130ee" nTx=3042
+INFO[0121]                                               block number=111 connection=100 seen tx=92159 seen tx/s=1265.67 seen tx/s avg=1011.68 sent tx=94343 sent tx/s=907.86
+INFO[0122]                                               block number=111 connection=100 seen tx=92159 seen tx/s=1265.67 seen tx/s avg=1034.77 sent tx=95418 sent tx/s=907.86
+INFO[0123] new block                                     block number=112 block time="2019-02-15 02:26:50 +0100 CET" difficulty=2 gasLimit=70679522474576 gasUsed=46139888 hash="7beba7…495a21" nTx=2183
+INFO[0123]                                               block number=112 connection=100 seen tx=94342 seen tx/s=1252.77 seen tx/s avg=1046.70 sent tx=95419 sent tx/s=617.49
+INFO[0124]                                               block number=112 connection=100 seen tx=94342 seen tx/s=1252.77 seen tx/s avg=1065.44 sent tx=97418 sent tx/s=617.49
+INFO[0124] new block                                     block number=113 block time="2019-02-15 02:26:52 +0100 CET" difficulty=2 gasLimit=70610499570998 gasUsed=22742336 hash="93deed…dab874" nTx=1076
+INFO[0125]                                               block number=113 connection=100 seen tx=95418 seen tx/s=669.31 seen tx/s avg=985.07 sent tx=98400 sent tx/s=1244.07
 ```
 
 ## Clients
@@ -56,7 +66,8 @@ INFO[0025] Hash="e50506…533ed9" cb=0x0000000000000000000000000000000000000000 
 
  - [x] sendTransaction
  - [ ] sendTransactionAsync (quorum)
- - [ ] sendRawTransaction
+ - [x] sendRawTransaction
+ - [ ] sendRawTransaction (quorum)
  - [ ] sendRawPrivateTransaction (quorum)
 
 ## Status report
