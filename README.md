@@ -54,7 +54,7 @@ INFO[0125]                                               block number=113 connec
 ## Transaction type
 
  - [x] Public
- - [ ] Private
+ - [x] Private
  - [ ] Contract
 
 ## Endpoint type
