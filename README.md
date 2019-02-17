@@ -22,6 +22,16 @@ Flags:
       --rpc-url string       Quorum RPC URL (e.g: http://kaleido.io/...) (default "http://127.0.0.1:8545")
       --to string            Address to send the payload
 ```
+## Install
+
+ - [Golang](https://golang.org/doc/install)
+
+Then
+
+```
+go get github.com/Magicking/quorum-stress/cmd/stress
+stress --help
+```
 
 ## Example
 
@@ -65,7 +75,7 @@ INFO[0125]                                               block number=113 connec
 ## RPC
 
  - [x] sendTransaction
- - [ ] sendTransactionAsync (quorum)
+ - [x] sendTransactionAsync (quorum)
  - [x] sendRawTransaction
  - [ ] sendRawTransaction (quorum)
  - [ ] sendRawPrivateTransaction (quorum)

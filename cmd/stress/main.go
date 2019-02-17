@@ -34,16 +34,19 @@ const (
 )
 
 var Ethopts struct {
-	RPCURL            string   `long:"rpc-url" env:"RPC_URL" description:"Quorum RPC URL (e.g: http://kaleido.io/...)"`
-	Retry             int      `long:"retry" env:"RETRY" description:"Max connection retry"`
-	From              string   `long:"from" env:"FROM" description:"Address of the emiter"`
-	To                string   `long:"to" env:"TO" description:"Address to send the payload"`
-	Payload           string   `long:"payload" default:"00" env:"PAYLOAD" description:"Transaction payload"`
-	PrivateFor        []string `long:"privateFor" env:"PRIVATE_FOR" description:"Base64 encoded public key"`
-	PrivateKey        string   `long:"pkey" env:"PRIVATE_KEY" description:"Hex encoded private key"`
-	MaxOpenConnection int64    `long:"max-open-conn" default:"1" env:"MAX_OPEN_CONNECTION" description:"Maximum opened connection to Quorum"`
-	MaxTransaction    int64    `long:"max-tx" default:"1" env:"MAX_TRANSACTION" description:"Maximum transaction to send"`
-	ABI               string   `long:"abi" env:"ABI" description:"ABI to enable events watching"`
+	RPCURL             string   `long:"rpc-url" env:"RPC_URL" description:"Quorum RPC URL (e.g: ws://kaleido.io/...)"`
+	Retry              int      `long:"retry" env:"RETRY" description:"Max connection retry"`
+	From               string   `long:"from" env:"FROM" description:"Address of the emiter"`
+	To                 string   `long:"to" env:"TO" description:"Address to send the payload"`
+	Payload            string   `long:"payload" default:"00" env:"PAYLOAD" description:"Transaction payload"`
+	PrivateFor         []string `long:"privateFor" env:"PRIVATE_FOR" description:"Base64 encoded public key"`
+	PrivateKey         string   `long:"pkey" env:"PRIVATE_KEY" description:"Hex encoded private key"`
+	MaxOpenConnection  int64    `long:"max-open-conn" default:"1" env:"MAX_OPEN_CONNECTION" description:"Maximum opened connection to Quorum"`
+	MaxTransaction     int64    `long:"max-tx" default:"1" env:"MAX_TRANSACTION" description:"Maximum transaction to send"`
+	ABI                string   `long:"abi" env:"ABI" description:"ABI to enable events watching"`
+	ASync              bool     `long:"async" env:"ASYNC" description:"Sending unsigned transaction with Quorum Async RPC"`
+	ASyncAddr          string   `long:"async-addr" env:"ASYNC_ADDR" description:"Listening address of Async RPC callback server"`
+	ASyncAdvertisedUrl string   `long:"async-advertised-url" env:"ASYNC_ADVERTISED_URL" description:"ASync Callback URL"`
 }
 
 // TransactionArgs represents the arguments for a transaction.
@@ -60,7 +63,8 @@ type TransactionArgs struct {
 type TransactionArgsPrivate struct {
 	TransactionArgs
 	PrivateFrom string   `json:"privateFrom,omitempty"`
-	PrivateFor  []string `json:"privateFor"`
+	PrivateFor  []string `json:"privateFor,omitempty"`
+	CallbackUrl string   `json:"callbackUrl,omitempty"`
 }
 
 func (tx *TransactionArgsPrivate) SignedTransaction(transactor *bind.TransactOpts) []byte {
@@ -80,7 +84,10 @@ func (tx *TransactionArgsPrivate) SignedTransaction(transactor *bind.TransactOpt
 }
 
 func SendUnsignedTransaction(ec *rpc.Client, txArgs *TransactionArgsPrivate) (ret string, err error) {
-	return ret, ec.Call(&ret, "eth_sendTransaction", txArgs)
+	if txArgs.CallbackUrl == "" {
+		return ret, ec.Call(&ret, "eth_sendTransaction", txArgs)
+	}
+	return ret, ec.Call(&ret, "eth_sendTransactionAsync", txArgs)
 }
 
 func SendSignedTransaction(ec *rpc.Client, txArgs *TransactionArgsPrivate, transactor *bind.TransactOpts) (ret string, err error) {
@@ -134,6 +141,9 @@ func sendTransaction(counter *int64, c chan string, startPill <-chan interface{}
 			switch TransactionKind {
 			case kindUnsigned:
 				txHash, err = SendUnsignedTransaction(client, transactArg)
+			case kindAsync:
+				transactArg.CallbackUrl = Ethopts.ASyncAdvertisedUrl
+				txHash, err = SendUnsignedTransaction(client, transactArg)
 			case kindSigned:
 				txHash, err = SendSignedTransaction(client, transactArg, transactor)
 			}
@@ -141,6 +151,9 @@ func sendTransaction(counter *int64, c chan string, startPill <-chan interface{}
 				atomic.AddInt64(counter, -1)
 				log.Println("SendTranction", err)
 				break
+			}
+			if TransactionKind == kindAsync {
+				continue
 			}
 			c <- txHash
 		}
@@ -154,6 +167,9 @@ var rootCmd = &cobra.Command{
 		var wg sync.WaitGroup
 		var counter int64
 		var err error
+
+		c := make(chan string)
+		startPill := make(chan interface{})
 
 		NM, err = NewNonceManager(Ethopts.Retry, Ethopts.RPCURL)
 		if err != nil {
@@ -176,9 +192,17 @@ var rootCmd = &cobra.Command{
 		if Ethopts.From != "" && TransactionKind != kindSigned {
 			TransactionKind = kindUnsigned
 		}
+		if Ethopts.ASync {
+			if Ethopts.PrivateKey != "" {
+				log.Fatal("Cannot send Quorum ASync signed transaction")
+			}
+			ascServer := NewASyncCallbackServer(Ethopts.ASyncAddr, c)
+			go func() {
+				log.Fatal(ascServer.Run())
+			}()
+			TransactionKind = kindAsync
+		}
 		log.Println("From", Ethopts.From)
-		c := make(chan string)
-		startPill := make(chan interface{})
 		go func() {
 			for i := int64(0); i < Ethopts.MaxOpenConnection && i < Ethopts.MaxTransaction; i++ {
 				wg.Add(1)
@@ -194,6 +218,7 @@ var rootCmd = &cobra.Command{
 		if err := TxWatcher(c, startPill); err != nil {
 			log.Fatal(err)
 		}
+		Done <- true
 	},
 }
 
@@ -222,9 +247,11 @@ func main() {
 	rootCmd.PersistentFlags().Int64Var(&Ethopts.MaxOpenConnection, "max-open-conn", 1, "Maximum opened connection to Quorum")
 	rootCmd.PersistentFlags().Int64Var(&Ethopts.MaxTransaction, "max-tx", 1, "Maximum transaction to send")
 	rootCmd.PersistentFlags().StringVar(&Ethopts.ABI, "abi", "", "ABI to enable events watching")
+	rootCmd.PersistentFlags().BoolVar(&Ethopts.ASync, "async", false, "Sending unsigned transaction with Quorum Async RPC")
+	rootCmd.PersistentFlags().StringVar(&Ethopts.ASyncAddr, "async-addr", ":18547", "Listening address of Async RPC callback server")
+	rootCmd.PersistentFlags().StringVar(&Ethopts.ASyncAdvertisedUrl, "async-advertised-url", "http://localhost:18547/sendTransactionAsync", "ASync Callback URL")
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	<-Done
 }
