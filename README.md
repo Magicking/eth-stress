@@ -29,6 +29,8 @@ Flags:
 ## Install
 
  - [Golang](https://golang.org/doc/install)
+or
+ - [Docker](https://docs.docker.com/compose/install/)
 
 Then
 
@@ -40,9 +42,7 @@ stress --help
 ## Example
 
 ```
-go get github.com/Magicking/quorum-stress/cmd/stress
-
-stress --from 0x6120a30e955b6dd99c9adc6e1ece6dcc6d48a53f --to 0x6120a7e00f3b2937362dfdac9f80b79f5b55f165 --rpc-url ws://127.0.0.1:8546 --max-tx 20000 --max-open-conn 200
+docker-compose run --rm stress --from 0x6120a30e955b6dd99c9adc6e1ece6dcc6d48a53f --to 0x6120a7e00f3b2937362dfdac9f80b79f5b55f165 --rpc-url ws://192.168.0.1:8546 --max-tx 20000 --max-open-conn 200
 
 INFO[0014] Start time 2019-02-08 02:24:38.872591 +0100 CET m=+0.014778258 
 INFO[0121] new block                                     block number=111 block time="2019-02-15 02:26:48 +0100 CET" difficulty=2 gasLimit=70748612822601 gasUsed=64295712 hash="1921b2…5130ee" nTx=3042
