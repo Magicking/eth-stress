@@ -2,7 +2,7 @@
 
 ## Description
 
-A WIP CLI ethereum client transaction stresser
+A CLI ethereum client transaction stresser
 
 ## Usage
 
@@ -11,16 +11,20 @@ Usage:
   stress [flags]
 
 Flags:
-      --from string          Address of the emiter
-  -h, --help                 help for stress
-      --max-open-conn int    Maximum opened connection to Quorum (default 1)
-      --max-tx int           Maximum transaction to send (default 1)
-      --payload string       Transaction payload (default "00")
-      --pkey string          Hex encoded private key
-      --privateFor strings   Base64 encoded public key
-      --retry int            Max connection retry (default 3)
-      --rpc-url string       Quorum RPC URL (e.g: http://kaleido.io/...) (default "http://127.0.0.1:8545")
-      --to string            Address to send the payload
+      --abi string                    ABI to enable events watching
+      --async                         Sending unsigned transaction with Quorum Async RPC
+      --async-addr string             Listening address of Async RPC callback server (default ":18547")
+      --async-advertised-url string   ASync Callback URL (default "http://localhost:18547/sendTransactionAsync")
+      --from string                   Address of the emiter
+  -h, --help                          help for stress
+      --max-open-conn int             Maximum opened connection to Quorum (default 1)
+      --max-tx int                    Maximum transaction to send (default 1)
+      --payload string                Transaction payload (default "00")
+      --pkey string                   Hex encoded private key
+      --privateFor strings            Base64 encoded public key
+      --retry int                     Max connection retry (default 3)
+      --rpc-url string                Quorum RPC URL (e.g: http://kaleido.io/...) (default "http://127.0.0.1:8545")
+      --to string                     Address to send the payload
 ```
 ## Install
 
@@ -53,11 +57,11 @@ INFO[0125]                                               block number=113 connec
 
 ## Clients
 
- - [x] go-ethereum
- - [x] Quorum
- - [x] Parity (to be tested)
+ - [ ] [Pantheon](https://github.com/PegaSysEng/pantheon/blob/master/docs/index.md#what-is-pantheon)
+ - [x] [go-ethereum](https://github.com/ethereum/go-ethereum/wiki/Command-Line-Options)
+ - [x] [Quorum](https://github.com/jpmorganchase/quorum/wiki/Using-Quorum)
+ - [x] [Parity](https://wiki.parity.io/Basic-Usage) (to be tested)
  - [ ] Ganache
- - [ ] Pantheon
  - [x] Infura (to be tested)
  - [ ] Ethereum 2.0 client
 
@@ -74,14 +78,24 @@ INFO[0125]                                               block number=113 connec
 
 ## RPC
 
- - [x] sendTransaction
- - [x] sendTransactionAsync (quorum)
- - [x] sendRawTransaction
- - [ ] sendRawTransaction (quorum)
- - [ ] sendRawPrivateTransaction (quorum)
+ - [x] [sendTransaction](https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_sendtransaction)
+ - [x] [sendTransactionAsync](https://github.com/jpmorganchase/quorum/blob/master/docs/api.md#eth_sendtransactionasync) (quorum)
+ - [x] [sendRawTransaction](https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_sendrawtransaction)
+ - [ ] [sendRawPrivateTransaction](https://github.com/jpmorganchase/quorum/blob/master/docs/api.md#ethsendrawprivatetransaction) (quorum)
+ - [ ] [storeraw](https://github.com/jpmorganchase/tessera/wiki/Interface-&-API#third-party-http-public-api) (quorum/tessera)
 
 ## Status report
 
  - [x] CLI
  - [ ] JSON
  - [ ] CSV
+
+## Output
+
+ * `seen tx/s` is number of transaction seen per second since last block
+ * `seen tx/s avg` is average of last 10 secs of `seen tx/s`
+ * `sent tx/s` is number of transaction sent per second since last block
+ * `block number` is last processed block number
+ * `connection` is number of transacting connection open
+ * `seen tx` is number of seen tx
+ * `sent tx` is number of sent tx
