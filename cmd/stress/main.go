@@ -34,14 +34,14 @@ const (
 )
 
 var Ethopts struct {
-	RPCURL             string   `long:"rpc-url" env:"RPC_URL" description:"Quorum RPC URL (e.g: ws://kaleido.io/...)"`
+	RPCURL             string   `long:"rpc-url" env:"RPC_URL" description:"Ethereum client WebSocket RPC URL"`
 	Retry              int      `long:"retry" env:"RETRY" description:"Max connection retry"`
 	From               string   `long:"from" env:"FROM" description:"Address of the emiter"`
 	To                 string   `long:"to" env:"TO" description:"Address to send the payload"`
 	Payload            string   `long:"payload" default:"00" env:"PAYLOAD" description:"Transaction payload"`
 	PrivateFor         []string `long:"privateFor" env:"PRIVATE_FOR" description:"Base64 encoded public key"`
 	PrivateKey         string   `long:"pkey" env:"PRIVATE_KEY" description:"Hex encoded private key"`
-	MaxOpenConnection  int64    `long:"max-open-conn" default:"1" env:"MAX_OPEN_CONNECTION" description:"Maximum opened connection to Quorum"`
+	MaxOpenConnection  int64    `long:"max-open-conn" default:"1" env:"MAX_OPEN_CONNECTION" description:"Maximum opened connection to ethereum client"`
 	MaxTransaction     int64    `long:"max-tx" default:"1" env:"MAX_TRANSACTION" description:"Maximum transaction to send"`
 	ABI                string   `long:"abi" env:"ABI" description:"ABI to enable events watching"`
 	ASync              bool     `long:"async" env:"ASYNC" description:"Sending unsigned transaction with Quorum Async RPC"`
@@ -237,14 +237,14 @@ func main() {
 		log.Fatal("Forced exit")
 	}()
 
-	rootCmd.PersistentFlags().StringVar(&Ethopts.RPCURL, "rpc-url", "http://127.0.0.1:8545", "Quorum RPC URL (e.g: http://kaleido.io/...)")
+	rootCmd.PersistentFlags().StringVar(&Ethopts.RPCURL, "rpc-url", "ws://127.0.0.1:8546", "Ethereum client WebSocket RPC URL")
 	rootCmd.PersistentFlags().StringVar(&Ethopts.From, "from", "", "Address of the emiter")
 	rootCmd.PersistentFlags().StringVar(&Ethopts.To, "to", "", "Address to send the payload")
 	rootCmd.PersistentFlags().StringVar(&Ethopts.Payload, "payload", "00", "Transaction payload")
 	rootCmd.PersistentFlags().StringVar(&Ethopts.PrivateKey, "pkey", "", "Hex encoded private key")
 	rootCmd.PersistentFlags().StringSliceVar(&Ethopts.PrivateFor, "privateFor", nil, "Base64 encoded public key")
 	rootCmd.PersistentFlags().IntVar(&Ethopts.Retry, "retry", 3, "Max connection retry")
-	rootCmd.PersistentFlags().Int64Var(&Ethopts.MaxOpenConnection, "max-open-conn", 1, "Maximum opened connection to Quorum")
+	rootCmd.PersistentFlags().Int64Var(&Ethopts.MaxOpenConnection, "max-open-conn", 1, "Maximum opened connection to ethereum client")
 	rootCmd.PersistentFlags().Int64Var(&Ethopts.MaxTransaction, "max-tx", 1, "Maximum transaction to send")
 	rootCmd.PersistentFlags().StringVar(&Ethopts.ABI, "abi", "", "ABI to enable events watching")
 	rootCmd.PersistentFlags().BoolVar(&Ethopts.ASync, "async", false, "Sending unsigned transaction with Quorum Async RPC")

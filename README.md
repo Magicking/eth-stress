@@ -17,13 +17,13 @@ Flags:
       --async-advertised-url string   ASync Callback URL (default "http://localhost:18547/sendTransactionAsync")
       --from string                   Address of the emiter
   -h, --help                          help for stress
-      --max-open-conn int             Maximum opened connection to Quorum (default 1)
+      --max-open-conn int             Maximum opened connection to ethereum client (default 1)
       --max-tx int                    Maximum transaction to send (default 1)
       --payload string                Transaction payload (default "00")
       --pkey string                   Hex encoded private key
       --privateFor strings            Base64 encoded public key
       --retry int                     Max connection retry (default 3)
-      --rpc-url string                Quorum RPC URL (e.g: http://kaleido.io/...) (default "http://127.0.0.1:8545")
+      --rpc-url string                Ethereum client WebSocket RPC URL (default "ws://127.0.0.1:8546")
       --to string                     Address to send the payload
 ```
 ## Install
