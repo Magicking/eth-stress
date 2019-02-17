@@ -25,7 +25,7 @@ func TxWatcher(txChan <-chan string, startPill chan interface{}) (err error) {
 	lastCount := time.Now()
 
 	for retry := 0; retry < Ethopts.Retry; retry++ {
-		time.Sleep((2 << uint(retry)) * time.Second)
+		time.Sleep((2 << uint(retry%3)) * time.Second)
 		client, err = ethclient.Dial(Ethopts.RPCURL)
 		if err == nil {
 			break
@@ -84,7 +84,7 @@ func TxWatcher(txChan <-chan string, startPill chan interface{}) (err error) {
 			log.Println(err)
 			Done <- true
 		case <-ticker.C:
-			b, err := client.BlockByNumber(context.TODO(), nil)
+			b, err := client.BlockByNumber(context.TODO(), nil) // TODO: Maximum 1 second of network context
 			if err != nil {
 				log.Println(err) //TODO
 				continue
