@@ -1,6 +1,7 @@
-version: '2'
+version: '3'
 services:
   stress:
     build: .
     ports:
       - "0.0.0.0:18547:18547"
+    network_mode: host
