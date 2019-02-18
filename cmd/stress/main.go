@@ -55,7 +55,8 @@ var Ethopts struct {
 	From               string   `long:"from" env:"FROM" description:"Address of the emiter"`
 	To                 string   `long:"to" env:"TO" description:"Address to send the payload"`
 	Payload            string   `long:"payload" default:"00" env:"PAYLOAD" description:"Transaction payload"`
-	PrivateFor         []string `long:"privateFor" env:"PRIVATE_FOR" description:"Base64 encoded public key"`
+	PrivateFrom        string   `long:"privateFrom" env:"PRIVATE_FROM" description:"Base64 Quorum privateFrom encoded public key (from)"`
+	PrivateFor         []string `long:"privateFor" env:"PRIVATE_FOR" description:"Base64 Quorum privateFor encoded public keys (to)"`
 	PrivateKey         string   `long:"pkey" env:"PRIVATE_KEY" description:"Hex encoded private key"`
 	MaxOpenConnection  int64    `long:"max-open-conn" default:"1" env:"MAX_OPEN_CONNECTION" description:"Maximum opened connection to ethereum client"`
 	MaxTransaction     int64    `long:"max-tx" default:"1" env:"MAX_TRANSACTION" description:"Maximum transaction to send"`
@@ -63,6 +64,7 @@ var Ethopts struct {
 	ASync              bool     `long:"async" env:"ASYNC" description:"Sending unsigned transaction with Quorum Async RPC"`
 	ASyncAddr          string   `long:"async-addr" env:"ASYNC_ADDR" description:"Listening address of Async RPC callback server"`
 	ASyncAdvertisedUrl string   `long:"async-advertised-url" env:"ASYNC_ADVERTISED_URL" description:"ASync Callback URL"`
+	EnclaveManagerUrl  string   `long:"enclave-manager-url" env:"ENCLAVE_MANAGER_URL" description:"Enclave Manager Public HTTP API"`
 }
 
 // TransactionArgs represents the arguments for a transaction.
@@ -99,6 +101,19 @@ func (tx *TransactionArgsPrivate) SignedTransaction(transactor *bind.TransactOpt
 	return buf.Bytes()
 }
 
+/*
+func (tx *TransactionArgsPrivate) PrivatePayload() {
+gasPrice: 0,
+gasLimit: 4300000,
+to: "",
+value: 0,
+data: initializedDeploy,
+from: decryptedAccount,
+privateFrom: TM1_PUBLIC_KEY,
+privateFor: TM2_PUBLIC_KEY,
+isPrivate: true
+}*/
+
 func SendUnsignedTransaction(ec *rpc.Client, txArgs *TransactionArgsPrivate) (ret string, err error) {
 	if txArgs.CallbackUrl == "" {
 		return ret, ec.Call(&ret, "eth_sendTransaction", txArgs)
@@ -108,6 +123,8 @@ func SendUnsignedTransaction(ec *rpc.Client, txArgs *TransactionArgsPrivate) (re
 
 func SendSignedTransaction(ec *rpc.Client, txArgs *TransactionArgsPrivate, transactor *bind.TransactOpts) (ret string, err error) {
 	rawtx := txArgs.SignedTransaction(transactor)
+	// storeRaw w/ Async
+	// sendRawTransaction w/ payload to new private hash and V byte to 0x2X
 	return ret, ec.Call(&ret, "eth_sendRawTransaction", "0x"+common.Bytes2Hex(rawtx))
 }
 
@@ -258,7 +275,8 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&Ethopts.To, "to", "", "Address to send the payload")
 	rootCmd.PersistentFlags().StringVar(&Ethopts.Payload, "payload", "00", "Transaction payload")
 	rootCmd.PersistentFlags().StringVar(&Ethopts.PrivateKey, "pkey", "", "Hex encoded private key")
-	rootCmd.PersistentFlags().StringSliceVar(&Ethopts.PrivateFor, "privateFor", nil, "Base64 encoded public key")
+	rootCmd.PersistentFlags().StringVar(&Ethopts.PrivateFrom, "privateFrom", "", "Base64 Quorum privateFrom encoded public key (from)")
+	rootCmd.PersistentFlags().StringSliceVar(&Ethopts.PrivateFor, "privateFor", nil, "Base64 Quorum privateFor encoded public keys (to)")
 	rootCmd.PersistentFlags().IntVar(&Ethopts.Retry, "retry", 3, "Max connection retry")
 	rootCmd.PersistentFlags().Int64Var(&Ethopts.MaxOpenConnection, "max-open-conn", 1, "Maximum opened connection to ethereum client")
 	rootCmd.PersistentFlags().Int64Var(&Ethopts.MaxTransaction, "max-tx", 1, "Maximum transaction to send")
@@ -266,6 +284,7 @@ func main() {
 	rootCmd.PersistentFlags().BoolVar(&Ethopts.ASync, "async", false, "Sending unsigned transaction with Quorum Async RPC")
 	rootCmd.PersistentFlags().StringVar(&Ethopts.ASyncAddr, "async-addr", ":18547", "Listening address of Async RPC callback server")
 	rootCmd.PersistentFlags().StringVar(&Ethopts.ASyncAdvertisedUrl, "async-advertised-url", "http://localhost:18547/sendTransactionAsync", "ASync Callback URL")
+	rootCmd.PersistentFlags().StringVar(&Ethopts.EnclaveManagerUrl, "enclave-manager-url", "http://127.0.0.1:9080", "Enclave Manager Public HTTP API")
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
