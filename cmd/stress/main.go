@@ -182,7 +182,7 @@ func sendTransaction(counter *int64, c chan string, startPill <-chan interface{}
 			}
 			if err != nil {
 				atomic.AddInt64(counter, -1)
-				log.Println("SendTranction", err)
+				log.Println("SendTransaction", err)
 				break
 			}
 			if TransactionKind == kindAsync {
