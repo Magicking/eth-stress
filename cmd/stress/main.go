@@ -168,6 +168,11 @@ func sendTransaction(counter *int64, c chan string, startPill <-chan interface{}
 		if to := common.HexToAddress(Ethopts.To); Ethopts.To != "" {
 			transactArg.To = &to
 		}
+		if TransactionKind == kindSigned {
+			if err = NM.RefreshNonce(transactArg.From); err != nil {
+				return err
+			}
+		}
 		for atomic.LoadInt64(counter) < Ethopts.MaxTransaction {
 			atomic.AddInt64(counter, 1)
 			var txHash string

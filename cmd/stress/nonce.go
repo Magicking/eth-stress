@@ -28,6 +28,7 @@ import (
 
 type Nonce struct {
 	c   chan uint64
+	nv  chan uint64
 	v   uint64
 	end chan interface{}
 }
@@ -35,6 +36,7 @@ type Nonce struct {
 func NewNonce(value uint64, deathPill chan interface{}) *Nonce {
 	return &Nonce{
 		c:   make(chan uint64),
+		nv:  make(chan uint64),
 		v:   value,
 		end: deathPill,
 	}
@@ -47,9 +49,29 @@ func (n *Nonce) Run() {
 			return
 		default:
 			n.c <- n.v
+			ok := true
+			for ok {
+				select {
+				case newValue := <-n.nv:
+					if newValue < n.v {
+						n.v = newValue - 1
+					}
+					continue
+				default:
+					ok = false
+				}
+			}
 			n.v++
 		}
 	}
+}
+
+func (n *Nonce) Refresh(value uint64) bool {
+	if value >= n.v {
+		return false
+	}
+	n.nv <- value
+	return true
 }
 
 func (n *Nonce) Next() uint64 {
@@ -65,7 +87,6 @@ type NonceManager struct {
 
 func NewNonceManager(retry int, rpcurl string) (nm *NonceManager, err error) {
 	var client *ethclient.Client
-	log.Println("Starting nonce manager")
 	for i := 0; i < retry; i++ {
 		time.Sleep((2 << uint(i)) * time.Second)
 		client, err = ethclient.Dial(rpcurl)
@@ -80,6 +101,7 @@ func NewNonceManager(retry int, rpcurl string) (nm *NonceManager, err error) {
 	if err != nil {
 		return nil, err
 	}
+	log.Println("Starting nonce manager on networkId:", networkId)
 	return &NonceManager{
 		from:      make(map[common.Address]*Nonce),
 		client:    client,
@@ -94,6 +116,10 @@ func (nm *NonceManager) Close() {
 }
 
 func (nm *NonceManager) Add(from common.Address) error {
+	balance, err := nm.client.BalanceAt(context.TODO(), from, nil)
+	if err != nil {
+		return err
+	}
 	nonce, err := nm.client.NonceAt(context.TODO(), from, nil)
 	if err != nil {
 		return err
@@ -101,9 +127,24 @@ func (nm *NonceManager) Add(from common.Address) error {
 	log.WithFields(log.Fields{
 		"address": from.String(),
 		"nonce":   nonce,
+		"balance": balance,
 	}).Info("Added account to NonceManager")
 	nm.from[from] = NewNonce(nonce, nm.deathPill)
 	go nm.from[from].Run()
+	return nil
+}
+
+func (nm *NonceManager) RefreshNonce(from common.Address) error {
+	nonce, err := nm.client.NonceAt(context.TODO(), from, nil)
+	if err != nil {
+		return err
+	}
+	if nm.from[from].Refresh(nonce) {
+		log.WithFields(log.Fields{
+			"address": from.String(),
+			"nonce":   nonce,
+		}).Info("Refresh nonce")
+	}
 	return nil
 }
 
