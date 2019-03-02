@@ -55,6 +55,7 @@ var Ethopts struct {
 	From               string   `long:"from" env:"FROM" description:"Address of the emiter"`
 	To                 string   `long:"to" env:"TO" description:"Address to send the payload"`
 	Payload            string   `long:"payload" default:"00" env:"PAYLOAD" description:"Transaction payload"`
+	GasPrice           string   `long:"gas-price" default:"2540be400" env:"GAS_PRICE" description:"Transaction gas price (hex format)"`
 	PrivateFrom        string   `long:"privateFrom" env:"PRIVATE_FROM" description:"Base64 Quorum privateFrom encoded public key (from)"`
 	PrivateFor         []string `long:"privateFor" env:"PRIVATE_FOR" description:"Base64 Quorum privateFor encoded public keys (to)"`
 	PrivateKey         string   `long:"pkey" env:"PRIVATE_KEY" description:"Hex encoded private key"`
@@ -128,7 +129,7 @@ func SendSignedTransaction(ec *rpc.Client, txArgs *TransactionArgsPrivate, trans
 	return ret, ec.Call(&ret, "eth_sendRawTransaction", "0x"+common.Bytes2Hex(rawtx))
 }
 
-func sendTransaction(counter *int64, c chan string, startPill <-chan interface{}) error {
+func sendTransaction(counter *int64, c chan string, startPill <-chan interface{}, defaultTx TransactionArgs) error {
 	<-startPill
 	if atomic.LoadInt64(counter) >= Ethopts.MaxTransaction {
 		return nil
@@ -157,16 +158,8 @@ func sendTransaction(counter *int64, c chan string, startPill <-chan interface{}
 			atomic.AddInt64(&OpenedConnection, -1)
 		}()
 		transactArg := &TransactionArgsPrivate{
-			TransactionArgs: TransactionArgs{
-				From:     common.HexToAddress(Ethopts.From),
-				Gas:      hexutil.Big(*big.NewInt(90000)),
-				GasPrice: hexutil.Big{},
-				Value:    hexutil.Big{},
-				Data:     []byte("00")},
-			PrivateFor: Ethopts.PrivateFor,
-		}
-		if to := common.HexToAddress(Ethopts.To); Ethopts.To != "" {
-			transactArg.To = &to
+			TransactionArgs: defaultTx,
+			PrivateFor:      Ethopts.PrivateFor,
 		}
 		if TransactionKind == kindSigned {
 			if err = NM.RefreshNonce(transactArg.From); err != nil {
@@ -205,6 +198,7 @@ var rootCmd = &cobra.Command{
 		var wg sync.WaitGroup
 		var counter int64
 		var err error
+		var gasPrice big.Int
 
 		c := make(chan string)
 		startPill := make(chan interface{})
@@ -241,11 +235,21 @@ var rootCmd = &cobra.Command{
 			TransactionKind = kindAsync
 		}
 		log.Println("From", Ethopts.From)
+		gasPrice.SetString(Ethopts.GasPrice, 16)
+		defaultTx := TransactionArgs{
+			From:     common.HexToAddress(Ethopts.From),
+			Gas:      hexutil.Big(*big.NewInt(90000)),
+			GasPrice: hexutil.Big(gasPrice),
+			Value:    hexutil.Big{},
+			Data:     common.Hex2Bytes(Ethopts.Payload)}
+		if to := common.HexToAddress(Ethopts.To); Ethopts.To != "" {
+			defaultTx.To = &to
+		}
 		go func() {
 			for i := int64(0); i < Ethopts.MaxOpenConnection && i < Ethopts.MaxTransaction; i++ {
 				wg.Add(1)
 				go func() {
-					if err := sendTransaction(&counter, c, startPill); err != nil {
+					if err := sendTransaction(&counter, c, startPill, defaultTx); err != nil {
 						log.Errorln(err)
 					}
 					defer wg.Done()
@@ -279,6 +283,7 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&Ethopts.From, "from", "", "Address of the emiter")
 	rootCmd.PersistentFlags().StringVar(&Ethopts.To, "to", "", "Address to send the payload")
 	rootCmd.PersistentFlags().StringVar(&Ethopts.Payload, "payload", "00", "Transaction payload")
+	rootCmd.PersistentFlags().StringVar(&Ethopts.GasPrice, "gas-price", "2540be400", "Transaction gas price (hex format)")
 	rootCmd.PersistentFlags().StringVar(&Ethopts.PrivateKey, "pkey", "", "Hex encoded private key")
 	rootCmd.PersistentFlags().StringVar(&Ethopts.PrivateFrom, "privateFrom", "", "Base64 Quorum privateFrom encoded public key (from)")
 	rootCmd.PersistentFlags().StringSliceVar(&Ethopts.PrivateFor, "privateFor", nil, "Base64 Quorum privateFor encoded public keys (to)")
