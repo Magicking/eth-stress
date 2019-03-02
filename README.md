@@ -16,12 +16,14 @@ Flags:
       --async-addr string             Listening address of Async RPC callback server (default ":18547")
       --async-advertised-url string   ASync Callback URL (default "http://localhost:18547/sendTransactionAsync")
       --from string                   Address of the emiter
+      --gas-price string              Transaction gas price (hex format) (default "2540be400")
   -h, --help                          help for stress
       --max-open-conn int             Maximum opened connection to ethereum client (default 1)
       --max-tx int                    Maximum transaction to send (default 1)
       --payload string                Transaction payload (default "00")
       --pkey string                   Hex encoded private key
-      --privateFor strings            Base64 encoded public key
+      --privateFor strings            Base64 Quorum privateFor encoded public keys (to)
+      --privateFrom string            Base64 Quorum privateFrom encoded public key (from)
       --retry int                     Max connection retry (default 3)
       --rpc-url string                Ethereum client WebSocket RPC URL (default "ws://127.0.0.1:8546")
       --to string                     Address to send the payload
@@ -57,7 +59,7 @@ INFO[0125]                                               block number=113 connec
 
 ## Clients
 
- - [ ] [Pantheon](https://github.com/PegaSysEng/pantheon/blob/master/docs/index.md#what-is-pantheon)
+ - [x] [Pantheon](https://github.com/PegaSysEng/pantheon/blob/master/docs/index.md#what-is-pantheon)
  - [x] [go-ethereum](https://github.com/ethereum/go-ethereum/wiki/Command-Line-Options)
  - [x] [Quorum](https://github.com/jpmorganchase/quorum/wiki/Using-Quorum)
  - [x] [Parity](https://wiki.parity.io/Basic-Usage) (to be tested)
