@@ -22,8 +22,8 @@ Flags:
       --max-tx int                    Maximum transaction to send (default 1)
       --payload string                Transaction payload (default "00")
       --pkey string                   Hex encoded private key
-      --privateFor strings            Base64 Quorum privateFor encoded public keys (to)
-      --privateFrom string            Base64 Quorum privateFrom encoded public key (from)
+      --privateFor strings            Base64 Quorum privateFor encoded public keys (private to)
+      --privateFrom string            Base64 Quorum privateFrom encoded public key (private from)
       --retry int                     Max connection retry (default 3)
       --rpc-url string                Ethereum client WebSocket RPC URL (default "ws://127.0.0.1:8546")
       --to string                     Address to send the payload
