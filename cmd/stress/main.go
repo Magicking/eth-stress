@@ -144,7 +144,7 @@ func sendTransaction(counter *int64, c chan string, startPill <-chan interface{}
 	}
 	// connect with at least X retry
 	for retry := 0; retry < Ethopts.Retry && atomic.LoadInt64(counter) < Ethopts.MaxTransaction; retry++ {
-		time.Sleep((2 << uint(retry)) * time.Second)
+		time.Sleep((2 << uint(retry%2)) * time.Second)
 		client, err := rpc.Dial(Ethopts.RPCURL)
 		if err != nil {
 			if (retry + 1) >= Ethopts.Retry {

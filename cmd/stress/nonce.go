@@ -54,6 +54,10 @@ func (n *Nonce) Run() {
 				select {
 				case newValue := <-n.nv:
 					if newValue < n.v {
+						log.WithFields(log.Fields{
+							"old": n.v,
+							"new": newValue - 1,
+						}).Info("Refresh nonce")
 						n.v = newValue - 1
 					}
 					continue
@@ -66,12 +70,11 @@ func (n *Nonce) Run() {
 	}
 }
 
-func (n *Nonce) Refresh(value uint64) bool {
+func (n *Nonce) Refresh(value uint64) {
 	if value >= n.v {
-		return false
+		return
 	}
 	n.nv <- value
-	return true
 }
 
 func (n *Nonce) Next() uint64 {
@@ -139,12 +142,7 @@ func (nm *NonceManager) RefreshNonce(from common.Address) error {
 	if err != nil {
 		return err
 	}
-	if nm.from[from].Refresh(nonce) {
-		log.WithFields(log.Fields{
-			"address": from.String(),
-			"nonce":   nonce,
-		}).Info("Refresh nonce")
-	}
+	nm.from[from].Refresh(nonce)
 	return nil
 }
 

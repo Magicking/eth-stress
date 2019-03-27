@@ -28,7 +28,7 @@ import (
 
 func TxWatcher(txChan <-chan string, startPill chan interface{}) (err error) {
 	txMap := make(map[string]bool)
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	sent := 0
 	seen := 0
 	lastSeen := 0
@@ -52,10 +52,10 @@ func TxWatcher(txChan <-chan string, startPill chan interface{}) (err error) {
 	}
 	defer client.Close()
 	bChan := make(chan *types.Header)
-	sub, err := client.SubscribeNewHead(context.TODO(), bChan)
-	if err != nil {
-		log.Fatalf("Could not register for event: %v", err)
-	}
+	//sub, err := client.SubscribeNewHead(context.TODO(), bChan)
+	//if err != nil {
+	//	log.Fatalf("Could not register for event: %v", err)
+	//}
 	log.Println("Start time", lastCount)
 	close(startPill)
 	for {
@@ -96,9 +96,9 @@ func TxWatcher(txChan <-chan string, startPill chan interface{}) (err error) {
 			lastSeen = seen
 			txpsSent = float64(sent-lastSent) / timeSpent
 			lastSent = sent
-		case err := <-sub.Err():
-			log.Println(err)
-			Done <- true
+			//		case err := <-sub.Err():
+			//			log.Println(err)
+			//			Done <- true
 		case <-ticker.C:
 			b, err := client.BlockByNumber(context.TODO(), nil) // TODO: Maximum 1 second of network context
 			if err != nil {
