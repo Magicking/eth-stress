@@ -52,7 +52,6 @@ func TxWatcher(txChan <-chan string, startPill chan interface{}) (err error) {
 		}
 	}
 	defer client.Close()
-	time.Sleep(10 * time.Second)
 
 	log.WithFields(log.Fields{
 		"time": lastCount,

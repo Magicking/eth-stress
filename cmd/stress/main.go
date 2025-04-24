@@ -50,22 +50,24 @@ const (
 )
 
 var Ethopts struct {
-	RPCURL             string   `long:"rpc-url" env:"RPC_URL" description:"Ethereum client WebSocket RPC URL"`
-	Retry              int      `long:"retry" env:"RETRY" description:"Max connection retry"`
-	From               string   `long:"from" env:"FROM" description:"Address of the emiter"`
-	To                 string   `long:"to" env:"TO" description:"Address to send the payload"`
-	Payload            string   `long:"payload" default:"00" env:"PAYLOAD" description:"Transaction payload"`
-	GasPrice           string   `long:"gas-price" default:"2540be400" env:"GAS_PRICE" description:"Transaction gas price (hex format)"`
-	PrivateFrom        string   `long:"privateFrom" env:"PRIVATE_FROM" description:"Base64 Quorum privateFrom encoded public key (from)"`
-	PrivateFor         []string `long:"privateFor" env:"PRIVATE_FOR" description:"Base64 Quorum privateFor encoded public keys (to)"`
-	PrivateKey         string   `long:"pkey" env:"PRIVATE_KEY" description:"Hex encoded private key"`
-	MaxOpenConnection  int64    `long:"max-open-conn" default:"1" env:"MAX_OPEN_CONNECTION" description:"Maximum opened connection to ethereum client"`
-	MaxTransaction     int64    `long:"max-tx" default:"1" env:"MAX_TRANSACTION" description:"Maximum transaction to send"`
-	ABI                string   `long:"abi" env:"ABI" description:"ABI to enable events watching"`
-	ASync              bool     `long:"async" env:"ASYNC" description:"Sending unsigned transaction with Quorum Async RPC"`
-	ASyncAddr          string   `long:"async-addr" env:"ASYNC_ADDR" description:"Listening address of Async RPC callback server"`
-	ASyncAdvertisedUrl string   `long:"async-advertised-url" env:"ASYNC_ADVERTISED_URL" description:"ASync Callback URL"`
-	EnclaveManagerUrl  string   `long:"enclave-manager-url" env:"ENCLAVE_MANAGER_URL" description:"Enclave Manager Public HTTP API"`
+	RPCURL               string   `long:"rpc-url" env:"RPC_URL" description:"Ethereum client WebSocket RPC URL"`
+	Retry                int      `long:"retry" env:"RETRY" description:"Max connection retry"`
+	From                 string   `long:"from" env:"FROM" description:"Address of the emiter"`
+	To                   string   `long:"to" env:"TO" description:"Address to send the payload"`
+	Payload              string   `long:"payload" default:"00" env:"PAYLOAD" description:"Transaction payload"`
+	GasPrice             string   `long:"gas-price" default:"2540be400" env:"GAS_PRICE" description:"Transaction gas price (hex format)"`
+	MaxPriorityFeePerGas string   `long:"max-priority-fee" env:"MAX_PRIORITY_FEE" description:"Max priority fee per gas for EIP-1559 transactions (hex format)"`
+	MaxFeePerGas         string   `long:"max-fee" env:"MAX_FEE" description:"Max fee per gas for EIP-1559 transactions (hex format)"`
+	PrivateFrom          string   `long:"privateFrom" env:"PRIVATE_FROM" description:"Base64 Quorum privateFrom encoded public key (from)"`
+	PrivateFor           []string `long:"privateFor" env:"PRIVATE_FOR" description:"Base64 Quorum privateFor encoded public keys (to)"`
+	PrivateKey           string   `long:"pkey" env:"PRIVATE_KEY" description:"Hex encoded private key"`
+	MaxOpenConnection    int64    `long:"max-open-conn" default:"1" env:"MAX_OPEN_CONNECTION" description:"Maximum opened connection to ethereum client"`
+	MaxTransaction       int64    `long:"max-tx" default:"1" env:"MAX_TRANSACTION" description:"Maximum transaction to send"`
+	ABI                  string   `long:"abi" env:"ABI" description:"ABI to enable events watching"`
+	ASync                bool     `long:"async" env:"ASYNC" description:"Sending unsigned transaction with Quorum Async RPC"`
+	ASyncAddr            string   `long:"async-addr" env:"ASYNC_ADDR" description:"Listening address of Async RPC callback server"`
+	ASyncAdvertisedUrl   string   `long:"async-advertised-url" env:"ASYNC_ADVERTISED_URL" description:"ASync Callback URL"`
+	EnclaveManagerUrl    string   `long:"enclave-manager-url" env:"ENCLAVE_MANAGER_URL" description:"Enclave Manager Public HTTP API"`
 }
 
 // TransactionArgs represents the arguments for a transaction.
@@ -76,6 +78,10 @@ type TransactionArgs struct {
 	GasPrice hexutil.Big     `json:"gasPrice"`
 	Value    hexutil.Big     `json:"value"`
 	Data     hexutil.Bytes   `json:"data"`
+	// EIP-1559 parameters
+	MaxPriorityFeePerGas *hexutil.Big    `json:"maxPriorityFeePerGas,omitempty"`
+	MaxFeePerGas         *hexutil.Big    `json:"maxFeePerGas,omitempty"`
+	Type                 *hexutil.Uint64 `json:"type,omitempty"`
 }
 
 // TransactionArgsPrivate represents the arguments for private transaction
@@ -88,13 +94,26 @@ type TransactionArgsPrivate struct {
 
 func (tx *TransactionArgsPrivate) SignedTransaction(transactor *bind.TransactOpts) []byte {
 	nonce := NM.NextNonce(tx.From)
-	_tx := types.NewTransaction(nonce, *tx.To, tx.Value.ToInt(), tx.Gas.ToInt().Uint64(), tx.GasPrice.ToInt(), tx.Data)
-	//types.NewEIP155Signer(big.NewInt(NM.NetworkId.Int64()))
+	var _tx *types.Transaction
+	if tx.Type != nil && *tx.Type == 2 {
+		// EIP-1559 transaction
+		_tx = types.NewTx(&types.DynamicFeeTx{
+			Nonce:     nonce,
+			To:        tx.To,
+			Value:     tx.Value.ToInt(),
+			Gas:       tx.Gas.ToInt().Uint64(),
+			Data:      tx.Data,
+			GasFeeCap: tx.MaxFeePerGas.ToInt(),
+			GasTipCap: tx.MaxPriorityFeePerGas.ToInt(),
+		})
+	} else {
+		// Legacy transaction
+		_tx = types.NewTransaction(nonce, *tx.To, tx.Value.ToInt(), tx.Gas.ToInt().Uint64(), tx.GasPrice.ToInt(), tx.Data)
+	}
 	signedTx, err := transactor.Signer(transactor.From, _tx)
 	if err != nil {
 		log.Fatal(err)
 	}
-	// TODO Quorum private
 	buf := bytes.NewBuffer(nil)
 	err = signedTx.EncodeRLP(buf)
 	if err != nil {
@@ -162,6 +181,19 @@ func sendTransaction(counter *int64, c chan string, startPill <-chan interface{}
 			TransactionArgs: defaultTx,
 			PrivateFor:      Ethopts.PrivateFor,
 		}
+
+		// Set EIP-1559 parameters if provided
+		if Ethopts.MaxPriorityFeePerGas != "" && Ethopts.MaxFeePerGas != "" {
+			priorityFee := new(big.Int)
+			priorityFee.SetString(Ethopts.MaxPriorityFeePerGas, 16)
+			maxFee := new(big.Int)
+			maxFee.SetString(Ethopts.MaxFeePerGas, 16)
+			transactArg.MaxPriorityFeePerGas = (*hexutil.Big)(priorityFee)
+			transactArg.MaxFeePerGas = (*hexutil.Big)(maxFee)
+			txType := hexutil.Uint64(2)
+			transactArg.Type = &txType
+		}
+
 		if TransactionKind == kindSigned {
 			if err = NM.RefreshNonce(transactArg.From); err != nil {
 				return err
@@ -239,7 +271,7 @@ var rootCmd = &cobra.Command{
 		gasPrice.SetString(Ethopts.GasPrice, 16)
 		defaultTx := TransactionArgs{
 			From:     common.HexToAddress(Ethopts.From),
-			Gas:      hexutil.Big(*big.NewInt(90000)),
+			Gas:      hexutil.Big(*big.NewInt(22000)),
 			GasPrice: hexutil.Big(gasPrice),
 			Value:    hexutil.Big{},
 			Data:     common.Hex2Bytes(Ethopts.Payload)}
@@ -294,6 +326,8 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&Ethopts.To, "to", "", "Address to send the payload")
 	rootCmd.PersistentFlags().StringVar(&Ethopts.Payload, "payload", "00", "Transaction payload")
 	rootCmd.PersistentFlags().StringVar(&Ethopts.GasPrice, "gas-price", "2540be400", "Transaction gas price (hex format)")
+	rootCmd.PersistentFlags().StringVar(&Ethopts.MaxPriorityFeePerGas, "max-priority-fee", "", "Max priority fee per gas for EIP-1559 transactions (hex format)")
+	rootCmd.PersistentFlags().StringVar(&Ethopts.MaxFeePerGas, "max-fee", "", "Max fee per gas for EIP-1559 transactions (hex format)")
 	rootCmd.PersistentFlags().StringVar(&Ethopts.PrivateKey, "pkey", "", "Hex encoded private key")
 	rootCmd.PersistentFlags().StringVar(&Ethopts.PrivateFrom, "privateFrom", "", "Base64 Quorum privateFrom encoded public key (from)")
 	rootCmd.PersistentFlags().StringSliceVar(&Ethopts.PrivateFor, "privateFor", nil, "Base64 Quorum privateFor encoded public keys (to)")
