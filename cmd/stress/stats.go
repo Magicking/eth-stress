@@ -21,13 +21,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	log "github.com/sirupsen/logrus"
 )
 
 func TxWatcher(txChan <-chan string, startPill chan interface{}) (err error) {
 	txMap := make(map[string]bool)
+	txTimestamps := make(map[string]time.Time) // Track when transactions were sent
 	ticker := time.NewTicker(1 * time.Second)
 	sent := 0
 	seen := 0
@@ -51,61 +52,74 @@ func TxWatcher(txChan <-chan string, startPill chan interface{}) (err error) {
 		}
 	}
 	defer client.Close()
-	bChan := make(chan *types.Header)
-	sub, err := client.SubscribeNewHead(context.TODO(), bChan)
-	if err != nil {
-		log.Fatalf("Could not register for event: %v", err)
-	}
-	log.Println("Start time", lastCount)
+	time.Sleep(10 * time.Second)
+
+	log.WithFields(log.Fields{
+		"time": lastCount,
+		"url":  Ethopts.RPCURL,
+	}).Info("Starting transaction watcher")
 	close(startPill)
+
 	for {
 		select {
 		case tx := <-txChan:
 			sent++
 			txMap[tx] = true
+			txTimestamps[tx] = time.Now()
+			log.WithFields(log.Fields{
+				"txHash":    tx,
+				"totalSent": sent,
+				"timestamp": time.Now(),
+			}).Debug("Transaction sent")
 		case <-Done:
 			Done <- true
 			return
-		case b := <-bChan:
-			blk, err := client.BlockByHash(context.TODO(), b.ParentHash)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			txs := blk.Transactions()
-			for _, tx := range txs {
-				if txMap[tx.Hash().Hex()] {
-					txMap[tx.Hash().Hex()] = false
+		case <-ticker.C:
+			// Check pending transactions
+			for txHash, pending := range txMap {
+				if !pending {
+					continue
+				}
+
+				tx, isPending, err := client.TransactionByHash(context.TODO(), common.HexToHash(txHash))
+				if err != nil {
+					if err.Error() != "not found" {
+						log.WithError(err).WithField("txHash", txHash).Error("Failed to get transaction")
+					}
+					continue
+				}
+
+				if !isPending {
+					txMap[txHash] = false
 					seen++
+					if sentTime, ok := txTimestamps[txHash]; ok {
+						confirmationTime := time.Since(sentTime)
+						log.WithFields(log.Fields{
+							"txHash":             txHash,
+							"confirmationTimeMs": confirmationTime.Milliseconds(),
+							"gasUsed":            tx.Gas(),
+						}).Info("Transaction confirmed")
+						delete(txTimestamps, txHash)
+					}
 				}
 			}
-			log.WithFields(log.Fields{
-				"block number": blk.Number(),
-				"hash":         blk.Hash().TerminalString(),
-				"difficulty":   blk.Difficulty(),
-				//				"extra":      hex.EncodeToString(b.Extra),
-				"gasLimit": blk.GasLimit(),
-				"gasUsed":  blk.GasUsed(),
-				"nTx":      blk.Transactions().Len(),
-				//				"cb":         blk.Coinbase().Hex(),
-				"block time": time.Unix(blk.Time().Int64(), 0),
-			}).Info("new block")
+
+			// Get current block number for stats
+			currentBlock, err := client.BlockNumber(context.TODO())
+			if err != nil {
+				log.WithError(err).Error("Failed to get current block number")
+				continue
+			}
+
 			timeSpent := time.Since(lastCount).Seconds()
 			lastCount = time.Now()
 			txpsSeen = float64(seen-lastSeen) / timeSpent
 			lastSeen = seen
 			txpsSent = float64(sent-lastSent) / timeSpent
 			lastSent = sent
-		case err := <-sub.Err():
-			log.Println(err)
-			Done <- true
-		case <-ticker.C:
-			b, err := client.BlockByNumber(context.TODO(), nil) // TODO: Maximum 1 second of network context
-			if err != nil {
-				log.Println(err) //TODO
-				continue
-			}
-			maxBlock = b.NumberU64()
+
+			// Update stats
+			maxBlock = currentBlock
 			txAvg = append(txAvg, txpsSeen)
 			var diff float64
 			for _, e := range txAvg {
@@ -115,15 +129,29 @@ func TxWatcher(txChan <-chan string, startPill chan interface{}) (err error) {
 			if len(txAvg) > 10 {
 				txAvg = txAvg[1:10]
 			}
+
+			// Check for long-pending transactions
+			now := time.Now()
+			for txHash, sentTime := range txTimestamps {
+				pendingDuration := now.Sub(sentTime)
+				if pendingDuration > 5*time.Minute {
+					log.WithFields(log.Fields{
+						"txHash":             txHash,
+						"pendingDurationMin": pendingDuration.Minutes(),
+					}).Warning("Transaction pending for extended period")
+				}
+			}
+
 			log.WithFields(log.Fields{
-				"seen tx/s avg": fmt.Sprintf("%.02f", diff),
-				"seen tx/s":     fmt.Sprintf("%.02f", txpsSeen),
-				"sent tx/s":     fmt.Sprintf("%.02f", txpsSent),
-				"block number":  maxBlock,
-				"connection":    OpenedConnection,
-				"seen tx":       seen,
-				"sent tx":       sent,
-			}).Info()
+				"seenTxPerSecAvg": fmt.Sprintf("%.02f", diff),
+				"seenTxPerSec":    fmt.Sprintf("%.02f", txpsSeen),
+				"sentTxPerSec":    fmt.Sprintf("%.02f", txpsSent),
+				"blockNumber":     maxBlock,
+				"connections":     OpenedConnection,
+				"seenTx":          seen,
+				"sentTx":          sent,
+				"pendingTx":       len(txTimestamps),
+			}).Info("Stats update")
 		}
 	}
 }

@@ -89,7 +89,8 @@ type TransactionArgsPrivate struct {
 func (tx *TransactionArgsPrivate) SignedTransaction(transactor *bind.TransactOpts) []byte {
 	nonce := NM.NextNonce(tx.From)
 	_tx := types.NewTransaction(nonce, *tx.To, tx.Value.ToInt(), tx.Gas.ToInt().Uint64(), tx.GasPrice.ToInt(), tx.Data)
-	signedTx, err := transactor.Signer(types.NewEIP155Signer(big.NewInt(NM.NetworkId.Int64())), transactor.From, _tx)
+	//types.NewEIP155Signer(big.NewInt(NM.NetworkId.Int64()))
+	signedTx, err := transactor.Signer(transactor.From, _tx)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -268,6 +269,15 @@ func main() {
 	sigs := make(chan os.Signal, 1)
 	Done = make(chan bool, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+	// Initialize logger
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp:   true,
+		TimestampFormat: "2006-01-02 15:04:05.000",
+	})
+
+	// Set log level to debug by default
+	log.SetLevel(log.DebugLevel)
 
 	go func() {
 		sig := <-sigs

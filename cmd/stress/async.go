@@ -40,20 +40,37 @@ func NewASyncCallbackServer(addr string, txChan chan string) *ASyncCallbackServe
 
 func (s *ASyncCallbackServer) Run() error {
 	http.HandleFunc("/sendTransactionAsync", func(w http.ResponseWriter, r *http.Request) {
+		log.WithFields(log.Fields{
+			"method": r.Method,
+			"path":   r.URL.Path,
+			"remote": r.RemoteAddr,
+		}).Debug("Received callback request")
+
 		d := json.NewDecoder(r.Body)
 		p := &callbackResponse{}
 		err := d.Decode(p)
 		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err.Error(),
+			}).Error("Failed to decode callback payload")
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
 		if p.Error != "" {
+			log.WithFields(log.Fields{
+				"error": p.Error,
+				"id":    p.Id,
+			}).Error("Callback reported error")
 			http.Error(w, p.Error, http.StatusInternalServerError)
 			return
 		}
-		//		log.WithFields(log.Fields{
-		//			"txHash": p.TxHash,
-		//		}).Info("POST callback")
+
+		log.WithFields(log.Fields{
+			"id":     p.Id,
+			"txHash": p.TxHash,
+		}).Info("Successfully processed callback")
+
 		s.txChan <- p.TxHash
 	})
 	log.WithFields(log.Fields{
